@@ -1,0 +1,49 @@
+# Builds the app on GitHub's Windows and macOS machines and uploads the
+# results as downloadable artifacts. Run it from the Actions tab
+# ("Run workflow"), or push a tag like v0.1.0.
+name: Build
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x64
+            os: windows-latest
+          - name: macos-arm64        # Apple Silicon
+            os: macos-latest
+          - name: macos-x64          # Intel; GitHub's last Intel macOS image
+            os: macos-15-intel
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Build (macOS)
+        if: runner.os == 'macOS'
+        run: ./build_mac.sh
+        # To sign + notarize, add repository secrets and import the certificate
+        # into a keychain first; see README "Signing".
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./build_windows.ps1
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: image-explorer-${{ matrix.name }}
+          path: |
+            dist/*.zip
+            dist/*.dmg
+          if-no-files-found: error
